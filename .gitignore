@@ -1,0 +1,5 @@
+node_modules/
+package-lock.json
+pages/
+popup-pages/
+.DS_Store

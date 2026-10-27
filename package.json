@@ -1,0 +1,14 @@
+{
+  "name": "popup-page",
+  "private": true,
+  "description": "Photo-to-paper-pop-up visual skill with image-model prompts and share-card composition.",
+  "type": "module",
+  "engines": {"node": ">=18"},
+  "scripts": {
+    "setup": "npx playwright install chromium",
+    "make": "node scripts/make.mjs",
+    "card": "node scripts/card.mjs"
+  },
+  "devDependencies": {"playwright": "1.63.0"},
+  "license": "MIT"
+}
