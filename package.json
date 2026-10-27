@@ -1,12 +1,13 @@
 {
   "name": "popup-page",
   "private": true,
-  "description": "Photo-to-paper-pop-up visual skill with image-model prompts and share-card composition.",
+  "description": "Claude skill: turn one photo into one page of a 3D pop-up book and a share image.",
   "type": "module",
   "engines": {"node": ">=18"},
   "scripts": {
     "setup": "npx playwright install chromium",
     "make": "node scripts/make.mjs",
+    "render": "node scripts/render.mjs",
     "card": "node scripts/card.mjs"
   },
   "devDependencies": {"playwright": "1.63.0"},

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pop-up Page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #171009; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #err { position: fixed; inset: 0; display: grid; place-items: center; color: #f3e6c9; font: 16px system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="err" hidden></div>
+<!--
+  One page of a 3D pop-up book, opened and posed for a still.
+  page.html?page=../examples/west-end/page.js            open the page and look around (drag, scroll, tap)
+  &shot=1                                                apply the page's `shot` (lights, pulls, camera) and stop hints
+  &view=az,pol,r                                         override the camera (degrees, degrees, × fitted distance)
+  &snap=WxH                                              render the still as one W × H frame into window.__png (fast: the live canvas can stay small)
+  &desk=paper                                            a plain paper desk and a pale cloth book instead of the wooden desk (for the print-style card)
+  When everything is in place, window.__ready is true (the render script waits for it).
+-->
+<script type="importmap">{"imports": {"three": "../engine/vendor/three/three.module.min.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {createReader} from '../engine/book3d.js';
+
+const q = new URLSearchParams(location.search);
+const quiet = {note() {}, loading() {}, hint() {}, state() {}};
+const wait = (ok, ms = 400000) => new Promise((res, rej) => { const t0 = performance.now();
+  (function poll() { if (ok()) res(); else if (performance.now() - t0 > ms) rej(new Error('timed out')); else setTimeout(poll, 50); })(); });
+try {
+  await Promise.race([
+    Promise.all(['600 40px "Cormorant Garamond"', 'italic 400 34px "Cormorant Garamond"', '400 24px "Noto Serif SC"'].map(f => document.fonts.load(f, 'Aa伦敦'))),
+    new Promise(r => setTimeout(r, 2500)),
+  ]);
+  const page = (await import(q.get('page'))).default;
+  const paperDesk = q.get('desk') === 'paper';
+  const book = {title: page.title, subtitle: page.subtitle || '', color: paperDesk ? '#d8ccb4' : page.color, cover: page.cover || null, spreads: [page.spread]};
+  const reader = await createReader({canvas: document.getElementById('scene'), book, ui: quiet});
+  window.__reader = reader;
+  if (paperDesk) {
+    // the desk becomes plain paper (it still takes the book's shadow) and the background matches it
+    const scene = reader.spreads[0].e.scene, PAPER = '#efe6d4';
+    scene.background = new THREE.Color(PAPER);
+    scene.traverse(m => { if (m.isMesh && m.geometry.parameters && m.geometry.parameters.width === 30) { m.material.map = null; m.material.color.set(PAPER); m.material.needsUpdate = true; } });
+  }
+  reader.open();
+  await wait(() => reader.cur === 0 && !reader.busy);
+  if (q.get('shot')) {
+    const shot = page.shot || {}, sp = reader.spreads[0];
+    sp.stopHints();
+    for (const [id, v] of Object.entries(shot.pulls || {})) reader.pull(id, v);
+    for (const id of shot.open || []) sp.byId[id] && (sp.byId[id].s.opened = true);
+    if (shot.lights !== undefined) sp.litTarget = shot.lights;
+    const v = q.get('view') ? Object.fromEntries(q.get('view').split(',').map((x, i) => [['az', 'pol', 'r'][i], +x])) : shot.view;
+    if (v) reader.setView(v);
+    await new Promise(r => setTimeout(r, +(q.get('settle') || 2500)));   // pieces ease into place, lights fade
+    if (q.get('snap')) { const [w, h] = q.get('snap').split('x').map(Number); window.__png = reader.snapshot({w, h, view: v || {}}).toDataURL('image/png'); }
+  }
+  window.__ready = true;
+} catch (e) {
+  console.error(e); const el = document.getElementById('err'); el.hidden = false; el.textContent = '打不开这一页：' + e.message;
+  window.__error = String(e && e.stack || e);
+}
+</script>
+</body>
+</html>

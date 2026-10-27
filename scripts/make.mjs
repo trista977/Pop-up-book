@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /* Prepare the photo, and compose the share image once the pop-up picture is there:
-     node scripts/make.mjs popup-pages/<slug> [--force]
+     node scripts/make.mjs popup-pages/<slug> [--prepare-only] [--force]
    1. Turns photo.heic into JPEG, keeps the date the photo was taken (EXIF DateTimeOriginal, the date only: no time, no
       place) in photo-meta.json for the share card's DATE line, then cleans the photo: re-encodes it in place without
-      its metadata (GPS position, camera, …) and scales it to at most 1600 px on the long side. Do this before the photo
-      goes to an image model.
-   2. If the folder has popup.png (the pop-up picture from the image model): node scripts/card.mjs <dir> → card.png
-      (--force composes even without a Chinese font). Without popup.png it stops after step 1.
+      its metadata (GPS position, camera, …) and scales it to at most 1600 px on the long side. The rendered share card uses the cleaned copy.
+   2. If page.js exists: render.mjs checks and renders it, then card.mjs composes card.png
+      (--force composes even without a Chinese font). Without page.js (or with --prepare-only) it stops after preprocessing.
    Then open card.png and go through references/publishing.md before posting it. */
 import {readFile, readdir, writeFile, access} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -16,7 +15,7 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2), dirArg = args.find(a => !a.startsWith('--'));
-if (!dirArg) { console.error('usage: node scripts/make.mjs <page folder> [--force]'); process.exit(2); }
+if (!dirArg) { console.error('usage: node scripts/make.mjs <page folder> [--prepare-only] [--force]'); process.exit(2); }
 const dir = path.resolve(dirArg);
 
 // 0 · iPhone photos (HEIC) are turned into JPEG first, keeping their EXIF (the date is read from it below): sips on a
@@ -88,11 +87,15 @@ if (memFile) {
 }
 if (Math.max(res.w, res.h) < 1000) console.warn(`WARNING: the photo is only ${Math.max(res.w, res.h)} px on its long side and will look blurred on the share card. Ask the user for the original (at least 1000 px, ideally 1600 or more).`);
 
-// 2 · compose, once the image model's pop-up picture is in the folder
-if (!(await readdir(dir)).includes('popup.png')) {
-  console.log(`\nphoto ready: ${path.relative(process.cwd(), photoPath)}\nNext: generate popup.png from it (references/prompt.md), write card.json, and run this again.`);
+// 2 · page.js is the source of the picture. Never reuse a stale popup.png when page.js exists.
+const names = await readdir(dir);
+if (args.includes('--prepare-only') || !names.includes('page.js')) {
+  console.log(`Photo prepared. Write page.js, then run make.mjs again.`);
   process.exit(0);
 }
-try { execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'card.mjs'), dir, ...(args.includes('--force') ? ['--force'] : [])], {stdio: 'inherit'}); }
-catch { process.exit(1); }
-console.log(`\ndone: ${path.relative(process.cwd(), path.join(dir, 'card.png'))}\nBefore posting: open card.png and go through references/publishing.md.`);
+const force = args.includes('--force') ? ['--force'] : [];
+try {
+  execFileSync(process.execPath, [path.join(ROOT, 'scripts/render.mjs'), dir, ...force], {stdio: 'inherit'});
+  execFileSync(process.execPath, [path.join(ROOT, 'scripts/card.mjs'), dir, ...force], {stdio: 'inherit'});
+} catch { process.exit(1); }
+console.log(`done: ${path.join(dir, 'card.png')}`);

@@ -1,6 +1,6 @@
 # 分享图
 
-`scripts/card.mjs` 把原照片和图像模型生成的立体书图排在一张图上。输入：同一文件夹里的 `photo.jpg`、`popup.png`、`card.json`（以及 `make.mjs` 写的 `photo-meta.json`）。
+`scripts/card.mjs` 把原照片和page.js 渲染的立体书图排在一张图上。输入：同一文件夹里的 `photo.jpg`、`popup.png`、`page.js`（`card.json` 可选）（以及 `make.mjs` 写的 `photo-meta.json`）。
 
 ## 版式（3:4，1080 × 1440，输出 2 倍）
 
@@ -24,7 +24,9 @@
 - 邮戳颜色：从照片里自动取冷色（天空、水、阴影的平均色），也可以用 `cool` 指定。
 - 日期：未设置 `date` 才读取拍摄日期；显式写 `"date": ""` 可省略日期。
 
-## card.json
+## 文案字段
+
+默认读取 `page.js` 的 `title`、`subtitle` 与 `card` 字面量，建议用单引号。也可提供下列 `card.json` 字段覆盖，不执行 page.js 来读取文案。
 
 | 字段 | 写法 | 例 |
 |---|---|---|

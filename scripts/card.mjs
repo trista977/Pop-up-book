@@ -1,44 +1,111 @@
 #!/usr/bin/env node
-/* Compose the share card: the original photo above, the pop-up page below, on one sheet of paper.
-     node scripts/card.mjs popup-pages/<slug> [--size 1080x1440] [--out card.png] [--force]
-   The photo full-bleed with a torn-paper bottom edge, a postmark in the photo's cool colour (or card.cool), a typewriter
-   heading, and the pop-up picture from the image model (popup.png, on a plain cream background, which is balanced to
-   the card's paper so the two become one sheet). PLACE and DATE along the bottom (card.date, or the date make.mjs kept
-   from the photo). The card always says the pop-up page was drawn with AI help (platforms such as Xiaohongshu ask for
-   AI content to be labelled).
-   Reads <dir>/photo.(jpg|jpeg|png|webp), <dir>/popup.png and <dir>/card.json:
-     {title, heading, place, date, stamp: 'CITY|COUNTRY', focus: CSS object-position of the photo crop, credit, cool}
-   Saves <dir>/card.png at 2× (2160 × 2880 for the default 3:4 size). */
+/* Compose the share card: the original photo above, the rendered pop-up page below, on a paper background.
+     node scripts/card.mjs examples/west-end [--size 1080x1440] [--out card.png] [--style print|classic]
+   print (default): the photo full-bleed with a torn-paper bottom edge, a postmark, a typewriter title, and the pop-up
+     page in its own colours (drawn from the photo) on the same paper: render with the paper desk (render.mjs default)
+     and the desk is balanced to the card's paper so the two become one sheet. The postmark is printed in the photo's
+     cool colour (or card.cool). PLACE and DATE along the bottom (card.date, or the date make.mjs kept from the photo).
+   classic: the photo as a taped Polaroid, the pop-up page in a white frame, the English and Chinese titles.
+   Reads <page dir>/photo.(jpg|jpeg|png|webp), <page dir>/popup.png (run render.mjs first) and the page's `card` /
+   `title` / `subtitle` fields (card.focus: which part of the photo to keep when it is cropped, a CSS object-position such
+   as '50% 20%' to keep the top; card.credit: a photo credit, required when the photo isn't the user's own). The card always
+   says the pop-up page was drawn with AI help (platforms such as Xiaohongshu ask for AI content to be labelled). Saves <page dir>/card.png at 2× (2160 × 2880 for the default 3:4 size). */
 import {readFile, readdir} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fontCheck, fontNote} from './fonts.mjs';
 
-const VALUED = new Set(['out', 'size']), opts = {}, pos = [];
+const VALUED = new Set(['out', 'size', 'style']), opts = {}, pos = [];
 for (let a = process.argv.slice(2), i = 0; i < a.length; i++) {
   if (!a[i].startsWith('--')) pos.push(a[i]); else { const k = a[i].slice(2); opts[k] = VALUED.has(k) ? a[++i] : true; }
 }
-if (!pos[0]) { console.error('usage: node scripts/card.mjs <page folder> [--size 1080x1440] [--out card.png] [--force]'); process.exit(2); }
+if (!pos[0]) { console.error('usage: node scripts/card.mjs <page folder> [--size 1080x1440] [--out card.png] [--style print|classic] [--force]'); process.exit(2); }
 const dir = path.resolve(pos[0]), out = path.resolve(dir, opts.out || 'card.png');
 const [W, H] = String(opts.size || '1080x1440').split('x').map(Number);
 
 const files = await readdir(dir);
 const photoFile = files.find(f => /^photo\.(jpe?g|png|webp)$/i.test(f));
 if (!photoFile) { console.error(`No photo.jpg / photo.png in ${dir}`); process.exit(2); }
-if (!files.includes('popup.png')) { console.error('No popup.png yet: generate the pop-up picture (references/prompt.md) and put it in the folder'); process.exit(2); }
-if (!files.includes('card.json')) { console.error(`No card.json in ${dir}: {"title", "heading", "place", "stamp", "focus"} (references/share-card.md)`); process.exit(2); }
+if (!files.includes('popup.png')) { console.error('No popup.png yet: run  node scripts/render.mjs ' + pos[0]); process.exit(2); }
 const dataUrl = async f => `data:image/${path.extname(f).slice(1).replace('jpg', 'jpeg')};base64,${(await readFile(path.join(dir, f))).toString('base64')}`;
 const [photo, popup] = await Promise.all([dataUrl(photoFile), dataUrl('popup.png')]);
 
-// the card's words, from card.json
-const json = JSON.parse(await readFile(path.join(dir, 'card.json'), 'utf8')), get = (k, d = '') => String(json[k] ?? d);
-const meta = {title: get('title'), heading: get('heading'), place: get('place'), date: get('date'), stamp: get('stamp'),
-  focus: get('focus', '50% 50%'), credit: get('credit'), warm: get('warm'), cool: get('cool')};
+// the page's words: title, subtitle and the `card` block ({zh, caption, place, time}); read from page.js as text so
+// the page module (which may need a browser) never has to run here
+const full = await readFile(path.join(dir, 'page.js'), 'utf8'), src = full.slice(full.lastIndexOf('export default'));
+const pick = (re, d = '') => (src.match(re) || [, d])[1];
+const meta = {
+  title: pick(/\btitle:\s*'([^']*)'/), subtitle: pick(/\bsubtitle:\s*'([^']*)'/),
+  zh: pick(/card:\s*{[^}]*\bzh:\s*'([^']*)'/), caption: pick(/card:\s*{[^}]*\bcaption:\s*'([^']*)'/),
+  place: pick(/card:\s*{[^}]*\bplace:\s*'([^']*)'/), time: pick(/card:\s*{[^}]*\btime:\s*'([^']*)'/),
+  credit: pick(/card:\s*{[^}]*\bcredit:\s*'([^']*)'/), focus: pick(/card:\s*{[^}]*\bfocus:\s*'([^']*)'/, '50% 50%'),
+  heading: pick(/card:\s*{[^}]*\bheading:\s*'([^']*)'/), date: pick(/card:\s*{[^}]*\bdate:\s*'([^']*)'/),
+  stamp: pick(/card:\s*{[^}]*\bstamp:\s*'([^']*)'/), warm: pick(/card:\s*{[^}]*\bwarm:\s*'([^']*)'/), cool: pick(/card:\s*{[^}]*\bcool:\s*'([^']*)'/),
+};
+// Optional structured overrides avoid relying on literal source formatting.
+const overrides = files.includes('card.json') ? JSON.parse(await readFile(path.join(dir, 'card.json'), 'utf8')) : {};
+for (const key of ['title', 'subtitle', 'zh', 'caption', 'place', 'time', 'credit', 'focus', 'heading', 'date', 'stamp', 'warm', 'cool']) {
+  if (Object.hasOwn(overrides, key)) meta[key] = String(overrides[key] ?? '');
+}
 // the date the photo was taken, kept by make.mjs before it strips the photo's metadata
-if (!Object.hasOwn(json, 'date') && files.includes('photo-meta.json')) try { meta.date = JSON.parse(await readFile(path.join(dir, 'photo-meta.json'), 'utf8')).date || ''; } catch {}
+if (!Object.hasOwn(overrides, 'date') && !/card:\s*{[^}]*\bdate:\s*'/.test(src) && !meta.date && files.includes('photo-meta.json')) try { meta.date = JSON.parse(await readFile(path.join(dir, 'photo-meta.json'), 'utf8')).date || ''; } catch {}
+const style = opts.style || 'print';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
-/* ---------- photo above a torn edge, the pop-up picture below ---------- */
+const classicHtml = () => `<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { width: ${W}px; height: ${H}px; overflow: hidden; background: #f3ead8; font-family: "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif; color: #3a2c20; position: relative; }
+  body::before { content: ""; position: absolute; inset: 0; background:
+    radial-gradient(circle at 20% 10%, rgba(255,255,255,.55), transparent 55%), radial-gradient(circle at 90% 90%, rgba(150,110,60,.12), transparent 50%);
+    pointer-events: none; }
+  .frame { position: absolute; inset: 22px; border: 2px solid #b9a37a; }
+  .frame::after { content: ""; position: absolute; inset: 8px; border: 1px solid #d6c4a0; }
+  .top { position: absolute; left: 0; right: 0; top: 56px; text-align: center; letter-spacing: .32em; font: 600 20px "Cormorant Garamond", serif; color: #8a6d48; }
+  .photo { position: absolute; left: 76px; top: 104px; width: ${W - 230}px; height: ${Math.round(H * .3)}px; background: #fffdf8; padding: 14px 14px 46px;
+    box-shadow: 0 10px 24px rgba(60,40,20,.22); transform: rotate(-2.2deg); }
+  .photo img { width: 100%; height: 100%; object-fit: cover; object-position: ${esc(meta.focus)}; display: block; }
+  .photo span { position: absolute; left: 18px; bottom: 12px; font: italic 600 22px "Cormorant Garamond", serif; color: #6d5a44; }
+  .photo em { position: absolute; right: 18px; bottom: 15px; font: 400 13px "Cormorant Garamond", serif; font-style: normal; color: #9a8a74; }
+  .ai { position: absolute; right: 56px; top: ${Math.round(H * .3) + 216 + Math.round(H * .37) + 12}px; font: 400 15px "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif; color: #9a8a74; letter-spacing: .08em; }
+  .tape { position: absolute; width: 120px; height: 34px; background: rgba(214,190,140,.65); top: -14px; }
+  .arrow { position: absolute; right: 92px; top: ${Math.round(H * .3) + 128}px; text-align: right; font: 500 22px "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif; color: #9a3a2e; }
+  .arrow svg { display: block; margin: 4px 0 0 auto; }
+  .popup { position: absolute; left: 50px; right: 50px; top: ${Math.round(H * .3) + 216}px; height: ${Math.round(H * .37)}px; border-radius: 6px; overflow: hidden;
+    box-shadow: 0 14px 30px rgba(40,25,10,.3); border: 10px solid #fffdf8; }
+  .popup img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: block; }
+  .words { position: absolute; left: 70px; right: 70px; bottom: 58px; }
+  .title { display: inline-block; white-space: nowrap; font: italic 600 58px "Cormorant Garamond", serif; color: #2e2218; line-height: 1; }
+  .title small { font: 500 24px "Cormorant Garamond", serif; letter-spacing: .2em; color: #8a6d48; margin-left: 14px; font-style: normal; }
+  .zh { margin-top: 12px; font: 600 26px "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif; color: #4a3826; }
+  .cap { margin-top: 8px; font: 400 20px "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif; color: #6d5a44; line-height: 1.55; }
+  .stamp { position: absolute; right: 70px; bottom: 64px; width: 112px; height: 112px; border-radius: 50%; border: 2px dashed #9a3a2e; color: #9a3a2e;
+    display: grid; place-items: center; text-align: center; font: 600 15px "Cormorant Garamond", serif; letter-spacing: .12em; transform: rotate(8deg); }
+</style></head><body>
+<div class="frame"></div>
+<div class="top">PHOTO&nbsp;&nbsp;→&nbsp;&nbsp;POP-UP</div>
+<div class="photo"><div class="tape" style="left:40px;transform:rotate(-6deg)"></div><div class="tape" style="right:40px;transform:rotate(5deg)"></div>
+  <img src="${photo}"><span>${esc(meta.place)}${meta.time ? ' · ' + esc(meta.time) : ''}</span>${meta.credit ? `<em>${esc(meta.credit)}</em>` : ''}</div>
+<div class="arrow">翻开，它就立起来了
+  <svg width="120" height="70" viewBox="0 0 120 70"><path d="M110,4 C100,40 60,52 18,56" fill="none" stroke="#9a3a2e" stroke-width="3" stroke-dasharray="7 6" stroke-linecap="round"/>
+  <path d="M30,46 L16,57 L32,64" fill="none" stroke="#9a3a2e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="popup"><img src="${popup}"></div>
+<div class="ai">立体页由 AI 辅助绘制</div>
+<div class="words">
+  <div class="title">${esc(meta.title)}<small>${esc(meta.subtitle).toUpperCase()}</small></div>
+  ${meta.zh ? `<div class="zh">${esc(meta.zh)}</div>` : ''}
+  ${meta.caption ? `<div class="cap" style="max-width:${W - 330}px">${esc(meta.caption)}</div>` : ''}
+</div>
+<div class="stamp">POP-UP<br>PAGE<br>№ 01</div>
+<script>
+  // a long title or subtitle shrinks until it clears the postmark
+  document.fonts.ready.then(() => { const t = document.querySelector('.title'), sm = t.querySelector('small'), gap = document.querySelector('.stamp').getBoundingClientRect().left - 24;
+    for (let k = 1; t.getBoundingClientRect().right > gap && k > .5; ) { k -= .04; t.style.fontSize = 58 * k + 'px'; sm.style.fontSize = 24 * k + 'px'; } });
+</script>
+</body></html>`;
+
+/* ---------- print: photo above a torn edge, the pop-up re-inked in two colours below ---------- */
 const PAPER = '#f1e9d8', SCF = '"Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif';
 const PH = Math.round(H * .46), POPY = PH + 108, POPH = H - POPY - 92;
 // the torn edge: a ragged line just above the bottom of the photo, with a pale fringe of torn fibres behind it
@@ -129,14 +196,14 @@ const rgb = ([h, s, l]) => { const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1
 </script>
 </body></html>`;
 
-const html = printHtml();
+const html = style === 'classic' ? classicHtml() : printHtml();
 
 let chromium;
 try { ({chromium} = createRequire(import.meta.url)('playwright')); } catch { ({chromium} = await import('playwright')); }
 const browser = await chromium.launch();
 const p = await browser.newPage({viewport: {width: W, height: H}, deviceScaleFactor: 2});
 await p.setContent(html, {waitUntil: 'networkidle'}).catch(() => {});
-await p.waitForFunction(() => window.__done, null, {timeout: 120000});
+if (style !== 'classic') { await p.waitForFunction(() => window.__done, null, {timeout: 120000}); console.log(`inks: ${JSON.stringify(await p.evaluate(() => window.__inks))}`); }
 const font = await p.evaluate(fontCheck); if (font !== 'web') console.warn(fontNote(font));
 if (font === 'none' && !opts.force) { await browser.close(); console.error('Stopped: no Chinese font (pass --force to compose anyway).'); process.exit(1); }
 await p.screenshot({path: out});

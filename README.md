@@ -4,10 +4,10 @@
 |---|---|
 | ![剑桥：原照片与纸艺立体书效果](assets/examples/cambridge-card.png) | ![塔桥：原照片与纸艺立体书效果](assets/examples/tower-bridge-card.png) |
 
-*分享图效果示例：沿用上一版展示图，纸艺部分由旧版 3D 流程渲染；当前生图流程的输出会有所不同。*
+*效果示例：SVG 手绘纸片 + page.js + 3D 渲染 + 分享图合成；本 skill 已恢复此流程。*
 
 
-将用户照片转换为 AI 辅助生成的纸艺立体书视觉效果，再合成“原照片 + 立体书”的分享图。包含提示词、照片预处理和排版脚本；需要宿主环境提供图像生成能力，不包含模型服务或 API 密钥。不保证固定耗时或真实可制作的折纸结构。
+将用户照片手绘为 SVG 纸片，在 `page.js` 中安排底页、V 折、立片和机关，再通过 three.js 渲染并合成分享图。无需图像生成模型或 API 密钥。输出 `page.js`、`popup.png`、`card.png`，还可在本机打开互动版。折纸检查是近似检查，不等于可制作图纸。
 
 ## 安装
 
@@ -24,13 +24,14 @@ Codex 可把仓库安装到 `~/.codex/skills/popup-page`；其他支持 `SKILL.m
 
 ## 使用
 
-对助手说“用这张照片做一张立体书分享图”。助手按 [SKILL.md](SKILL.md) 预处理、调用可用生图工具、检查并合成 `card.png`。
+对助手说“用这张照片做一张立体书分享图”。助手按 [SKILL.md](SKILL.md) 手绘 page.js、检查、3D 渲染并合成 `card.png`。
 
 ```bash
 mkdir -p popup-pages/my-trip
 cp /path/to/your-photo.jpg popup-pages/my-trip/photo.jpg
 node scripts/make.mjs popup-pages/my-trip
-# 按 references/prompt.md 生成 popup.png，再按 references/share-card.md 写 card.json
+cp templates/page.js popup-pages/my-trip/page.js
+# 按照片重画模板纸片并填写 page.js；不要直接交付占位图
 node scripts/make.mjs popup-pages/my-trip
 ```
 
@@ -39,9 +40,11 @@ node scripts/make.mjs popup-pages/my-trip
 ## 内容与许可
 
 - [SKILL.md](SKILL.md)：流程和使用边界。
-- `references/`：生图提示、分享图字段、素材及发布检查。
+- `references/`：折纸结构、手绘规范、页面格式、分享图及发布检查。
+- `engine/`、`viewer/`：three.js 引擎和本机互动查看器。
+- `templates/`、`layouts/`、`examples/*/page.js`：模板、河岸页型及示例代码。
 - `scripts/`：预处理、分享图合成、中文字体检查。
 - [LICENSE](LICENSE)：自行提供的代码和文档采用 MIT。
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)：第三方依赖、字体及上游许可。
 
-本项目为自主整理的工作流与脚本，使用第三方开源依赖及 AI 能力；不声称所有组成部分完全自研。仓库仅附上述两张合成展示图，不附原始照片或第三方书页截图；展示图仅用于本项目说明，不纳入代码的 MIT 授权，不对用户输入、第三方素材和生成输出施加本项目 MIT。使用者须按 [发布检查](references/publishing.md) 确认素材与模型条款；不保证生成图的独占版权或绝无侵权。
+本项目为自主整理的工作流与脚本，使用第三方开源依赖及 AI 辅助编写的代码；不声称所有组成部分完全自研。仓库仅附上述两张合成展示图，不附原始照片或第三方书页截图；展示图仅用于本项目说明，不纳入代码的 MIT 授权，不对用户输入、第三方素材和生成输出施加本项目 MIT。使用者须按 [发布检查](references/publishing.md) 确认素材与模型条款；不保证生成图的独占版权或绝无侵权。

@@ -1,0 +1,12 @@
+{
+  "source": "github.com/trista977/paper-city-popup",
+  "commit": "87500fb44dda218e9fe6245a09f1651c20282e7c",
+  "synced": "2026-10-26",
+  "files": {
+    "book3d.js": "6a4c75218deee64c69ea95475963417d1105119043c6c6a1fce357a252e8c170",
+    "paper-art.js": "52fb9eeb8db319fe1ff9cb1d36bba63026bf98c373e620ab4969cb69e1e65835",
+    "paper-check.js": "4c4a45437fb88b536f16f2cefd63d8048586d1f8808020f5d8b62f51dc8f9e45",
+    "vendor/three/three.module.min.js": "3e690ac7d180b0aadf0891bea39eec643e29e2d3e75c99b18689518665f69ba6",
+    "vendor/three/LICENSE": "852e0e8699169bf9f6fdc6bda3e682d078dcbc738b5d33e74df594721bff271d"
+  }
+}
