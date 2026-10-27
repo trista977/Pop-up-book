@@ -19,6 +19,8 @@
 | `mirror(a)` / `flipY(a)` | 翻转 |
 | 颜色常量 | `P`（纸色）`INK`（墨色）`RED` `GOLD` `NAVY` |
 
+重复窗格、石墙和配角街面优先用 `engine/architecture.js` 的 `windowGrid`、`masonry`、`facadeStrip`，示例见 [fast-authoring.md](fast-authoring.md)。主角轮廓仍按照片绘制。
+
 ## 规则
 
 1. **照片 → 简化**：保留辨识度最高的细节，其余简化成色块和重复的窗格。细节示例：

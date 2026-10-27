@@ -13,6 +13,10 @@ description: 将用户照片手绘为 SVG 纸片，通过 page.js 和 three.js �
 
 先按 [素材与发布检查](references/publishing.md) 记录输入来源；不引入未经授权的照片或书页截图。所有生成与渲染在本地完成，不需要图像模型或 API 密钥。
 
+## 编写效率
+
+默认按 [fast-authoring.md](references/fast-authoring.md) 复用页型、机关与参数化建筑细节，先确定主角轮廓和尺寸，再一次性补齐窗格与石纹，避免从零编写整页。不要为了快套用与照片不符的通用建筑。
+
 ## 1. 读照片与规划
 
 按 [photo-to-page.md](references/photo-to-page.md) 写简报：主角、时段、3–6 个识别细节、主色和五层布局。保持建筑轮廓、比例、屋顶与窗格节奏，不用通用房子代替照片主角。不确定地点不补写；多处照片合成须说明是旅行记忆拼景。
